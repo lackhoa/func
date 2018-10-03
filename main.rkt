@@ -10,6 +10,7 @@
                  (prefix-out old: not)))
 (require "lang/kara.rkt"
          'old)
+(provide (all-defined-out))
 
 ;;; Functional Forms
 (def ((construct . fs) x)
@@ -40,10 +41,32 @@
 (def ((const x) y)
   (and y x))
 
-(def ((insert )))
+(def ((insert f default) xs)
+  ;; Reduce/foldl
+  (match xs
+    ['()               default]
+    [(cons xcar xcdr)  (f (list xcar
+                                ((insert f default) xcdr)))]
+    [_                 #f]))
+
+(def ((alpha f) xs)
+  ;; Apply to all
+  (and (list? xs)
+     (map f xs)))
+
+(def ((bu f x) y)
+  ;; Binary to unary (currying)
+  (and x
+     (f `(,x ,y))))
+
+(def ((while p f) x)
+  (match (p x)
+    ['T  ((while p f) (f x))]
+    ['F  x]
+    [_   #f]))
 
 ;; #f stands for the bottom value, 'T and 'F stand for true and false
-(def (bsym b)  (match b [#t  'T] ['F  #f]))
+(def (bsym b)  (match b [#t  'T] [#f  'F]))
 (def (rbsym s) (match s ['T  #t] ['F  #f]))
 
 (def (cons x seq)
@@ -125,7 +148,7 @@
                     (old:/ x y))]
     [_           #f]))
 
-(def (transpose xss)
+(def (trans xss)
   (and (list? xss)
      (forall? list? xss)
      (apply eq*? (map length xss))
@@ -163,15 +186,23 @@
     [(list (? list? xs) y)  (pad xs y)]
     [_                      #f]))
 
-(def (seq-refr pos)
-  (compose (seq-ref pos) reverse))
-
 (def (tlr xs)
   (and (list? xs)
      (drop-right xs 1)))
 
-(def (rotl xs)
-  (compose apndr (construct tl (seq-ref 1))))
+;; Derived functions
+(def (seq-refr pos)
+  (compose (seq-ref pos) reverse))
 
-(def (rotr xs)
-  (compose apndl (construct (seq-refr 1) tlr)))
+(def rotl
+  (compose apndr (construct tl
+                      (seq-ref 0))))
+
+(def rotr
+  (compose apndl (construct (seq-refr 0)
+                      tlr)))
+
+(def last
+  (condition
+   [(compose null tl)  (seq-ref 0)]
+   (compose last tl)))
