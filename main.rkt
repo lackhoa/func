@@ -107,19 +107,24 @@
   ;; Binary to unary (currying)
   (f (list x y)))
 
+(def ((bur f y) x)
+  (f (list x y)))
+
 (def ((while p f) x)
   (match (p x)
     [#t  ((while p f) (f x))]
     [#f  x]
     [_   None]))
 
-(def ((list-ref pos) seq)
+(def (list-ref seq-pos)
   ;; List selector (kind of like python)
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
-    (match pos
-      [(or (? positive?) 0)  (old:list-ref seq pos)]
-      [_                    (old:list-ref (old:reverse seq)
-                                          (sub1 (- pos)))])))
+    (match seq-pos
+      [(list seq pos)  (match pos
+                         [(or (? positive?) 0)  (old:list-ref seq pos)]
+                         [_                    (old:list-ref (old:reverse seq)
+                                                             (sub1 (- pos)))])]
+      [_               None])))
 
 (def (car xs)
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
@@ -282,19 +287,26 @@
     (old:drop-right ls n)))
 
 ;; Derived functions
+(def 1st
+  (compose list-ref (pam id 0)))
+
+(def 2nd
+  (compose list-ref (pam id 1)))
+
+(def 3rd
+  (compose list-ref (pam id 2)))
+
+(def last
+  (compose list-ref (pam id -1)))
+
 (def rcdr
   (drop-right 1))
 
-(def last
-  (list-ref -1))
-
 (def rotl
-  (compose rcons (pam cdr
-                (list-ref 0))))
+  (compose rcons (pam cdr 1st)))
 
 (def rotr
-  (compose cons (pam (list-ref -1)
-               rcdr)))
+  (compose cons (pam last rcdr)))
 
 (def (negate pred)
   (compose not pred))
