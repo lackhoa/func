@@ -4,6 +4,7 @@
                  (prefix-out old: length)
                  (prefix-out old: reverse)
                  (prefix-out old: eq?)
+                 (prefix-out old: equal?)
                  (prefix-out old: +)
                  (prefix-out old: -)
                  (prefix-out old: *)
@@ -13,12 +14,20 @@
                  (prefix-out old: list-ref)
                  (prefix-out old: list?)
                  (prefix-out old: list)
+                 (prefix-out old: car)
                  (prefix-out old: cdr)
                  (prefix-out old: map)
                  (prefix-out old: drop-right)))
-(require "lang/kara.rkt"
-         'old)
+(require 'old)
 (provide (all-defined-out))
+
+;;; Macros & short-hands
+(define-syntax-rule (lam whatever ...)
+  (lambda whatever ...))
+
+(define-syntax-rule (def whatever ...)
+  (define whatever ...))
+
 
 (def None 'None  #|The Divine error code|#)
 
@@ -109,8 +118,11 @@
       [_                    (old:list-ref (old:reverse seq)
                                           (sub1 (- pos)))])))
 
+(def (car xs)
+  (with-handlers ([exn:fail?  (lambda (_)  'None)])
+    (old:car xs)))
+
 (def (cdr seq)
-  ;; cdr
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
     (old:cdr seq)))
 
@@ -125,21 +137,54 @@
   ;; The debugger of God
   (apply compose (add-between fs show)))
 
-;;; Booleans
-(def (list? x)
-  (with-handlers ([exn:fail?  (lambda (_)  'None)])
-    (old:list? x)))
+(def ((assert pred msg f ...) x)
+  (if (pred x)
+      x
+      (error msg (f x) ...)))
 
-(def (eq? xy)
-  (match xy
-    [(list x y)  (old:eq? x y)]
-    [_           'None]))
+;;; Booleans
+(def (not x)
+  (match x
+    [#t  #f]
+    [#f  #t]
+    [_   None]))
+
+(def or
+  (let ([or?-binary  (lam (xy)
+                       (match xy
+                         [(list #t #t)  #t]
+                         [(list #t #f)  #t]
+                         [(list #f #t)  #t]
+                         [(list #f #f)  #f]
+                         [_             None]))])
+    (// or?-binary #f)))
+
+(def and
+  (let ([and?-binary  (lam (xy)
+                        (match xy
+                          [(list #t #t)  #t]
+                          [(list #t #f)  #f]
+                          [(list #f #t)  #f]
+                          [(list #f #f)  #f]
+                          [_             None]))])
+    (// and?-binary #t)))
+
+
+;;; Rudimentary list functions
+(def (list? x)
+  (match x
+    ['None  None]
+    [_      (old:list? x)]))
 
 (def (null? x)
   (match x
     ['None  None]
     ['()    #t]
     [_      #f]))
+
+(def (length ls)
+  (with-handlers ([exn:fail?  (lambda (_)  'None)])
+    (old:length ls)))
 
 (def (reverse seq)
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
@@ -165,9 +210,31 @@
                                   [_      (list x y)]))]
       [_                      None])))
 
-(def (length ls)
-  (with-handlers ([exn:fail?  (lambda (_)  'None)])
-    (old:length ls)))
+(def eq?
+  (let ([eq?-binary  (lam (xy)
+                       (match xy
+                         [(list x y)  (old:eq? x y)]
+                         [_           'None]))])
+    (compose and
+       (map eq?-binary)
+       distl
+       (pam car cdr))))
+
+(def neq?
+  (compose not eq?))
+
+(def equal?
+  (let ([equal?-binary  (lam (xy)
+                          (match xy
+                            [(list x y)  (old:equal? x y)]
+                            [_           'None]))])
+    (compose and
+       (map equal?-binary)
+       distl
+       (pam car cdr))))
+
+(def nequal?
+  (compose not equal?))
 
 ;;; Arightmetic
 (def (+ xy)
@@ -197,31 +264,9 @@
 (def (trans xss)
   ;; Transpose
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
-    (match (apply eq*? (old:map old:length xss))
+    (match (eq? (old:map old:length xss))
       [#f  None]
       [#t  (apply old:map old:list xss)])))
-
-(def (& xy)
-  (match xy
-    [(list #t #t)  #t]
-    [(list #t #f)  #f]
-    [(list #f #t)  #f]
-    [(list #f #f)  #f]
-    [_             None]))
-
-(def (v xy)
-  (match xy
-    [(list #t #t)  #t]
-    [(list #t #f)  #t]
-    [(list #f #t)  #t]
-    [(list #f #f)  #f]
-    [_             None]))
-
-(def (not x)
-  (match x
-    [#t  #f]
-    [#f  #t]
-    [_   None]))
 
 (def (rcons xs-y)
   (match xs-y
@@ -247,3 +292,6 @@
 (def rotr
   (compose cons (pam (list-ref -1)
                rcdr)))
+
+(def (negate pred)
+  (compose not pred))
