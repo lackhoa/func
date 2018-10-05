@@ -28,16 +28,17 @@
 (define-syntax-rule (def whatever ...)
   (define whatever ...))
 
-
 (def None 'None  #|The Divine error code|#)
 
 ;;; Sequence-forming Forms, to protect list from containing None
-(def (cons x seq)
-  (match x
-    ['None  None]
-    [_      (if (list? seq)
-                (old:cons x seq)
-                None)]))
+(def (cons x-seq)
+  (match x-seq
+    [(list x seq)  (match x
+                     ['None  None]
+                     [_      (if (old:list? seq)
+                                 (old:cons x seq)
+                                 None)])]
+    [_             None]))
 
 (define-syntax list
   ;; This is a macro, since we don't want eagerness,
@@ -46,7 +47,9 @@
     [(_)            null]
     [(_ x1 x2 ...)  (match x1
                       ['None  None]
-                      [_      (cons x1 (list x2 ...))])]))
+                      [_      (match (list x2 ...)
+                                [(? old:list? xs)  (old:cons x1 xs)]
+                                [_                 None])])]))
 
 ;;; Functional Forms
 (def ((pam . fs) x)
@@ -102,7 +105,7 @@
 
 (def ((bu f x) y)
   ;; Binary to unary (currying)
-  (f (cons x (cons y null)  #|Done to avoid invalid list|#)))
+  (f (list x y)))
 
 (def ((while p f) x)
   (match (p x)
