@@ -157,7 +157,6 @@
     [#f  #t]
     [_   None]))
 
-
 ;;; Rudimentary list functions
 (def (list? x)
   (match x
@@ -169,8 +168,6 @@
     ['None  None]
     ['()    #t]
     [_      #f]))
-
-
 
 (def (length ls)
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
