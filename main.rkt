@@ -63,6 +63,12 @@
                       [fx     (loop (old:cons fx res)
                                     fs)])])))
 
+(def ((latte . fs) xs)
+  (old:cond [(length-eq? fs xs)  (for/list ([f fs]
+                                            [x xs])
+                                   (f x))]
+            [_                   None]))
+
 (define-syntax-rule (cond [p f]
                           ...
                           g)
@@ -103,12 +109,6 @@
                              [fxcar  (loop (old:cons fxcar res)
                                            xcdr)])]))))
 
-(def ((bu f x) y)
-  ;; Binary to unary (currying)
-  (f (list x y)))
-
-(def ((bur f y) x)
-  (f (list x y)))
 
 (def ((while p f) x)
   (match (p x)
@@ -157,26 +157,6 @@
     [#f  #t]
     [_   None]))
 
-(def or
-  (let ([or?-binary  (lam (xy)
-                       (match xy
-                         [(list #t #t)  #t]
-                         [(list #t #f)  #t]
-                         [(list #f #t)  #t]
-                         [(list #f #f)  #f]
-                         [_             None]))])
-    (// or?-binary #f)))
-
-(def and
-  (let ([and?-binary  (lam (xy)
-                        (match xy
-                          [(list #t #t)  #t]
-                          [(list #t #f)  #f]
-                          [(list #f #t)  #f]
-                          [(list #f #f)  #f]
-                          [_             None]))])
-    (// and?-binary #t)))
-
 
 ;;; Rudimentary list functions
 (def (list? x)
@@ -189,6 +169,8 @@
     ['None  None]
     ['()    #t]
     [_      #f]))
+
+
 
 (def (length ls)
   (with-handlers ([exn:fail?  (lambda (_)  'None)])
@@ -220,29 +202,20 @@
 
 (def eq?
   (let ([eq?-binary  (lam (xy)
-                       (match xy
-                         [(list x y)  (old:eq? x y)]
-                         [_           'None]))])
-    (compose and
-       (map eq?-binary)
-       distl
-       (pam car cdr))))
-
-(def neq?
-  (compose not eq?))
+                       (old:eq? (1st xy)
+                                (2nd xy)))])
+    (compose (while (compose not-null? 1st)
+         (cond [(compose eq-binary? (pam 2nd (compose car 1st)))  (pam (compose cdr 1st) 2nd #t)]
+               (pam (k null) 2nd #f)))
+       (pam cdr car))))
 
 (def equal?
   (let ([equal?-binary  (lam (xy)
-                          (match xy
-                            [(list x y)  (old:equal? x y)]
-                            [_           'None]))])
+                          (old:equal? (1st xy) (2nd xy)))])
     (compose and
        (map equal?-binary)
        distl
        (pam car cdr))))
-
-(def nequal?
-  (compose not equal?))
 
 ;;; Arightmetic
 (def (+ xy)
@@ -287,6 +260,9 @@
     (old:drop-right ls n)))
 
 ;; Derived functions
+(def (eqk? v)
+  (compose eq? (pam (k v) id)))
+
 (def 1st
   (compose list-ref (pam id 0)))
 
@@ -310,3 +286,38 @@
 
 (def (negate pred)
   (compose not pred))
+
+(def (bu f x)
+  ;; Binary to unary (currying)
+  (compose f (pam (k x) id)))
+
+(def (bur f y)
+  (compose f (pam id (k y))))
+
+(def (flip f)
+  (compose f rotr))
+
+(def not-null?
+  (negate null?))
+
+(def or
+  (compose 2nd
+     (while (compose not-null? 1st)
+       (cond [(compose (eqk? #t) 2nd)  (pam (k null) (k #t))]
+             [(compose (eqk? #f) 2nd)  (pam (compose cdr 1st) (k #f))]
+             None))
+     (pam id (k #f)  #|(xs, #f)|#)))
+
+(def and
+  (compose 2nd
+     (while (compose not-null? 1st)
+       (cond [(compose (eqk? #f) 2nd)  (pam (k null) (k #f))]
+             [(compose (eqk? #t) 2nd)  (pam (compose cdr 1st) (k #t))]
+             None))
+     (pam id (k #t)  #|(xs, #t)|#)))
+
+(def neq?
+  (compose not eq?))
+
+(def nequal?
+  (compose not equal?))
